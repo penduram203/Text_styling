@@ -1,0 +1,9 @@
+{
+    "display_name": "Text Styling Extension",
+    "js": "text-styling.js",
+    "css": "text-styling.css",
+    "author": "Your Name",
+    "version": "2.1.0",
+    "description": "Customize text appearance with separate settings for strong and normal text",
+    "auto_update": true
+}
