@@ -1,34 +1,47 @@
-// 公式ローダーは動的import()でこのファイルを読み込むため、その時点で
-// DOMContentLoadedは発火済み（二度と発火しない）。よってこのイベントを
-// 待つのではなく、readyStateを見て即時実行するか、まだloading中なら
-// イベントを待つ、という防御的な初期化パターンに変更する。
+import { extensionSettings, saveSettingsDebounced } from '../../../../script.js';
+
 function initTextStyling() {
-    console.log('テキストスタイル拡張機能 v6-modified: 初期化開始');
+    console.log('テキストスタイル拡張機能 v6-server-sync: 初期化開始');
 
     const TAG_CONFIG = {
         p: {
-            label: '<p>',
+            label: 'P',
             isDynamic: false,
             defaults: { enabled: true, fontSize: 100, fontWeight: 400, textColor: '#dddddd', outlineColor: '#000000', outlineWidth: 1, lineHeight: 1.5, textOpacity: 1.0 }
         },
         q: {
-            label: '<q>',
+            label: 'Q',
             isDynamic: false,
             defaults: { enabled: true, fontSize: 100, fontWeight: 400, textColor: '#dddddd', outlineColor: '#000000', outlineWidth: 1, lineHeight: 1.5, textOpacity: 1.0 }
         },
         em: {
-            label: '<em>',
+            label: 'EM',
             isDynamic: false,
             defaults: { enabled: true, fontSize: 100, fontWeight: 400, textColor: '#dddddd', outlineColor: '#000000', outlineWidth: 1, lineHeight: 1.5, textOpacity: 1.0 }
         }
     };
+
     const OTHER_DEFAULTS = {
         chatWindowOpacity: 1.0,
         panelMinimized: false,
         activeTab: 'p'
     };
+
     const controls = {};
     let chatObserver = null;
+
+    // 初期設定が extensionSettings になければデフォルトを割り当て
+    if (!extensionSettings.text_styling) {
+        extensionSettings.text_styling = {
+            tags: {},
+            chatWindowOpacity: OTHER_DEFAULTS.chatWindowOpacity,
+            panelMinimized: OTHER_DEFAULTS.panelMinimized,
+            activeTab: OTHER_DEFAULTS.activeTab
+        };
+        Object.keys(TAG_CONFIG).forEach(tagName => {
+            extensionSettings.text_styling.tags[tagName] = { ...TAG_CONFIG[tagName].defaults };
+        });
+    }
 
     function hexToRgb(hex) {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -47,7 +60,7 @@ function initTextStyling() {
 
     const restoreButton = document.createElement('button');
     restoreButton.id = 'restore-panel-button';
-    restoreButton.innerHTML = '⚙️';
+    restoreButton.innerHTML = '⚙';
     restoreButton.title = '設定パネルの表示/非表示';
     restoreButton.onclick = () => {
         panel.classList.toggle('hidden');
@@ -157,11 +170,11 @@ function initTextStyling() {
             <input type="range" id="chat-opacity" min="0" max="100" step="1">
         </div>`;
     panel.appendChild(chatSection);
-    
+
     controls.chatOpacityInput = chatSection.querySelector('#chat-opacity');
     controls.chatOpacityValue = chatSection.querySelector('#chat-opacity-value');
     controls.chatOpacityInput.addEventListener('input', updateChatWindowOpacity);
-    
+
     tabButtons.addEventListener('click', e => {
         if (e.target.matches('.tab-button')) {
             setActiveTab(e.target.dataset.tab);
@@ -174,12 +187,9 @@ function initTextStyling() {
         tabContents.querySelectorAll('.tab-content').forEach(content => content.classList.toggle('active', content.dataset.tabContent === tabId));
     }
 
-
     // --- 統合されたスタイル適用関数 ---
     function applyStylesToMessage(mesTextElement) {
         if (!mesTextElement) return;
-
-        // 静的スタイルのクラスをON/OFF
         Object.keys(TAG_CONFIG).forEach(tagName => {
             if (!TAG_CONFIG[tagName].isDynamic) {
                 const isEnabled = controls[tagName].enabledCheckbox.checked;
@@ -193,9 +203,9 @@ function initTextStyling() {
         const tagControls = controls[tagName];
         const rootStyle = document.documentElement.style;
         const enabled = tagControls.enabledCheckbox.checked;
+
         tagControls.content.classList.toggle('disabled', !enabled);
-        
-        // CSS変数を更新
+
         if (enabled) {
             const fontSize = parseInt(tagControls.fontSizeInput.value);
             const fontWeight = parseInt(tagControls.fontWeightInput.value);
@@ -204,7 +214,7 @@ function initTextStyling() {
             const outlineColor = tagControls.outlineColorInput.value;
             const outlineWidth = parseFloat(tagControls.outlineWidthInput.value);
             const textOpacity = parseFloat(tagControls.textOpacityInput.value) / 100;
-            
+
             tagControls.fontSizeValue.textContent = fontSize;
             tagControls.fontWeightValue.textContent = fontWeight;
             tagControls.lineHeightValue.textContent = lineHeight.toFixed(1);
@@ -219,12 +229,11 @@ function initTextStyling() {
             rootStyle.setProperty(`--${tagName}-outline-width`, `${outlineWidth}px`);
             rootStyle.setProperty(`--${tagName}-outline-rgb`, hexToRgb(outlineColor));
         }
-        
-        // すべてのメッセージにスタイルを再適用
+
         document.querySelectorAll('#chat .mes_text').forEach(applyStylesToMessage);
         saveSettings();
     }
-    
+
     function updateChatWindowOpacity() {
         const opacity = parseInt(controls.chatOpacityInput.value) / 100;
         controls.chatOpacityValue.textContent = controls.chatOpacityInput.value;
@@ -241,7 +250,7 @@ function initTextStyling() {
         chatObserver = new MutationObserver(mutations => {
             for (const mutation of mutations) {
                 for (const node of mutation.addedNodes) {
-                    if (node.nodeType === 1) { // ELEMENT_NODE
+                    if (node.nodeType === 1) {
                         const targets = node.classList.contains('mes_text') ? [node] : node.querySelectorAll('.mes_text');
                         targets.forEach(applyStylesToMessage);
                     }
@@ -251,18 +260,23 @@ function initTextStyling() {
         chatObserver.observe(chatElement, { childList: true, subtree: true });
         console.log("チャット監視オブザーバーをセットアップしました。");
     }
-    
-    // --- 設定の保存と復元 (バージョン更新 v6) ---
+
+    // --- 設定の保存と復元 (extensionSettings & saveSettingsDebounced 移行版) ---
     function saveSettings() {
-        const settings = {
-            tags: {},
-            chatWindowOpacity: parseFloat(controls.chatOpacityInput.value) / 100,
-            panelMinimized: panel.classList.contains("hidden"),
-            activeTab: tabButtons.querySelector(".tab-button.active")?.dataset.tab || "p",
-        };
+        if (!extensionSettings.text_styling) {
+            extensionSettings.text_styling = { tags: {} };
+        }
+
+        extensionSettings.text_styling.chatWindowOpacity = parseFloat(controls.chatOpacityInput.value) / 100;
+        extensionSettings.text_styling.panelMinimized = panel.classList.contains("hidden");
+        extensionSettings.text_styling.activeTab = tabButtons.querySelector(".tab-button.active")?.dataset.tab || "p";
+
         Object.keys(TAG_CONFIG).forEach(tagName => {
             const t = controls[tagName];
-            settings.tags[tagName] = {
+            if (!extensionSettings.text_styling.tags) {
+                extensionSettings.text_styling.tags = {};
+            }
+            extensionSettings.text_styling.tags[tagName] = {
                 enabled: t.enabledCheckbox.checked,
                 fontSize: parseInt(t.fontSizeInput.value),
                 fontWeight: parseInt(t.fontWeightInput.value),
@@ -273,18 +287,20 @@ function initTextStyling() {
                 textOpacity: parseFloat(t.textOpacityInput.value) / 100,
             };
         });
-        localStorage.setItem("textStylingSettings_v6_modified", JSON.stringify(settings));
+
+        // サーバー側へ保存を依頼
+        saveSettingsDebounced();
     }
 
     function restoreSettings() {
-        const saved = localStorage.getItem('textStylingSettings_v6_modified');
-        if (saved) {
+        const settings = extensionSettings.text_styling;
+        if (settings) {
             try {
-                const settings = JSON.parse(saved);
                 Object.keys(TAG_CONFIG).forEach(tagName => {
                     const savedTag = settings.tags?.[tagName] || {};
                     const defaultTag = TAG_CONFIG[tagName].defaults;
                     const tagControls = controls[tagName];
+
                     tagControls.enabledCheckbox.checked = savedTag.enabled ?? defaultTag.enabled;
                     tagControls.fontSizeInput.value = savedTag.fontSize ?? defaultTag.fontSize;
                     tagControls.fontWeightInput.value = savedTag.fontWeight ?? defaultTag.fontWeight;
@@ -294,7 +310,9 @@ function initTextStyling() {
                     tagControls.outlineWidthInput.value = savedTag.outlineWidth ?? defaultTag.outlineWidth;
                     tagControls.textOpacityInput.value = Math.round((savedTag.textOpacity ?? defaultTag.textOpacity) * 100);
                 });
+
                 controls.chatOpacityInput.value = Math.round((settings.chatWindowOpacity ?? OTHER_DEFAULTS.chatWindowOpacity) * 100);
+
                 if (settings.panelMinimized) {
                     panel.classList.add('hidden');
                 }
@@ -306,7 +324,7 @@ function initTextStyling() {
         } else {
             setDefaultSettings();
         }
-        
+
         // 起動時にすべてのスタイルを適用
         const originalSave = saveSettings;
         saveSettings = () => {}; // 復元中の不要な保存を抑制
@@ -319,6 +337,7 @@ function initTextStyling() {
         Object.keys(TAG_CONFIG).forEach(tagName => {
             const defaults = TAG_CONFIG[tagName].defaults;
             const tagControls = controls[tagName];
+
             tagControls.enabledCheckbox.checked = defaults.enabled;
             Object.keys(defaults).forEach(key => {
                 if (key !== "enabled") {
@@ -335,6 +354,7 @@ function initTextStyling() {
                 }
             });
         });
+
         controls.chatOpacityInput.value = Math.round(OTHER_DEFAULTS.chatWindowOpacity * 100);
         panel.classList.remove('hidden');
         setActiveTab(OTHER_DEFAULTS.activeTab);
@@ -349,7 +369,7 @@ function initTextStyling() {
     // --- 初期化処理 ---
     setTimeout(() => {
         console.log('拡張機能の初期化処理を開始');
-        
+
         const windowControlContainer = document.createElement('div');
         windowControlContainer.id = 'window-control-buttons';
         document.body.appendChild(windowControlContainer);
@@ -383,6 +403,7 @@ function initTextStyling() {
                 sheld.style.width = '50vw';
                 sheld.style.margin = 'unset';
             });
+
             const topLimit = 35;
             sheldheader.addEventListener('mousedown', () => {
                 sheld.style.resize = 'both';
@@ -397,7 +418,7 @@ function initTextStyling() {
                 document.addEventListener('mouseup', onMouseUp, { once: true });
             });
         }
-        
+
         restoreSettings();
         setupObservers();
     }, 500);
