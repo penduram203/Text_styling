@@ -1,7 +1,7 @@
-import { extensionSettings, saveSettingsDebounced } from '../../../../script.js';
+import { extensionSettings, saveSettingsDebounced, eventSource, eventTypes } from '../../../../script.js';
 
 function initTextStyling() {
-    console.log('テキストスタイル拡張機能 v6-server-sync: 初期化開始');
+    console.log('テキストスタイル拡張機能 (EventSource版): 初期化開始');
 
     const TAG_CONFIG = {
         p: {
@@ -28,7 +28,6 @@ function initTextStyling() {
     };
 
     const controls = {};
-    let chatObserver = null;
 
     // 初期設定が extensionSettings になければデフォルトを割り当て
     if (!extensionSettings.text_styling) {
@@ -187,7 +186,7 @@ function initTextStyling() {
         tabContents.querySelectorAll('.tab-content').forEach(content => content.classList.toggle('active', content.dataset.tabContent === tabId));
     }
 
-    // --- 統合されたスタイル適用関数 ---
+    // --- メッセージ要素へのスタイル適用処理 ---
     function applyStylesToMessage(mesTextElement) {
         if (!mesTextElement) return;
         Object.keys(TAG_CONFIG).forEach(tagName => {
@@ -196,6 +195,10 @@ function initTextStyling() {
                 mesTextElement.classList.toggle(`style-${tagName}-enabled`, isEnabled);
             }
         });
+    }
+
+    function applyStylesToAllMessages() {
+        document.querySelectorAll('#chat .mes_text').forEach(applyStylesToMessage);
     }
 
     // --- コントロール変更時のメイン処理 ---
@@ -230,7 +233,7 @@ function initTextStyling() {
             rootStyle.setProperty(`--${tagName}-outline-rgb`, hexToRgb(outlineColor));
         }
 
-        document.querySelectorAll('#chat .mes_text').forEach(applyStylesToMessage);
+        applyStylesToAllMessages();
         saveSettings();
     }
 
@@ -241,27 +244,23 @@ function initTextStyling() {
         saveSettings();
     }
 
-    // --- オブザーバーセットアップ ---
-    function setupObservers() {
-        if (chatObserver) chatObserver.disconnect();
-        const chatElement = document.getElementById('chat');
-        if (!chatElement) return;
+    // --- SillyTavern EventSource イベントリスナー登録 (MutationObserverの代替) ---
+    function setupEventListeners() {
+        if (!eventSource || !eventTypes) {
+            console.warn('[Text Styling] eventSource または eventTypes が定義されていません。');
+            return;
+        }
 
-        chatObserver = new MutationObserver(mutations => {
-            for (const mutation of mutations) {
-                for (const node of mutation.addedNodes) {
-                    if (node.nodeType === 1) {
-                        const targets = node.classList.contains('mes_text') ? [node] : node.querySelectorAll('.mes_text');
-                        targets.forEach(applyStylesToMessage);
-                    }
-                }
-            }
-        });
-        chatObserver.observe(chatElement, { childList: true, subtree: true });
-        console.log("チャット監視オブザーバーをセットアップしました。");
+        // メッセージ生成時・描画時・チャット切替時にスタイルを自動適用
+        eventSource.on(eventTypes.CHARACTER_MESSAGE_RENDERED, applyStylesToAllMessages);
+        eventSource.on(eventTypes.USER_MESSAGE_RENDERED, applyStylesToAllMessages);
+        eventSource.on(eventTypes.MESSAGE_UPDATED, applyStylesToAllMessages);
+        eventSource.on(eventTypes.CHAT_CHANGED, applyStylesToAllMessages);
+
+        console.log('[Text Styling] SillyTavern EventSource リスナーを登録しました。');
     }
 
-    // --- 設定の保存と復元 (extensionSettings & saveSettingsDebounced 移行版) ---
+    // --- 設定の保存と復元 ---
     function saveSettings() {
         if (!extensionSettings.text_styling) {
             extensionSettings.text_styling = { tags: {} };
@@ -288,7 +287,6 @@ function initTextStyling() {
             };
         });
 
-        // サーバー側へ保存を依頼
         saveSettingsDebounced();
     }
 
@@ -325,9 +323,8 @@ function initTextStyling() {
             setDefaultSettings();
         }
 
-        // 起動時にすべてのスタイルを適用
         const originalSave = saveSettings;
-        saveSettings = () => {}; // 復元中の不要な保存を抑制
+        saveSettings = () => {};
         Object.keys(TAG_CONFIG).forEach(tagName => updateStyleAndAllMessages(tagName));
         updateChatWindowOpacity();
         saveSettings = originalSave;
@@ -420,7 +417,7 @@ function initTextStyling() {
         }
 
         restoreSettings();
-        setupObservers();
+        setupEventListeners();
     }, 500);
 }
 
