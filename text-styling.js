@@ -1,8 +1,7 @@
-import { getContext, eventSource, event_types } from '../../../script.js';
-import { extension_settings, saveSettingsDebounced } from '../../../extensions.js';
+import { extensionSettings, saveSettingsDebounced } from '../../../../script.js';
 
 function initTextStyling() {
-    console.log('テキストスタイル拡張機能 (EventSource版): 初期化開始');
+    console.log('テキストスタイル拡張機能 v6-server-sync: 初期化開始');
 
     const TAG_CONFIG = {
         p: {
@@ -29,17 +28,18 @@ function initTextStyling() {
     };
 
     const controls = {};
+    let chatObserver = null;
 
-    // 初期設定が extension_settings になければデフォルトを割り当て
-    if (!extension_settings.text_styling) {
-        extension_settings.text_styling = {
+    // 初期設定が extensionSettings になければデフォルトを割り当て
+    if (!extensionSettings.text_styling) {
+        extensionSettings.text_styling = {
             tags: {},
             chatWindowOpacity: OTHER_DEFAULTS.chatWindowOpacity,
             panelMinimized: OTHER_DEFAULTS.panelMinimized,
             activeTab: OTHER_DEFAULTS.activeTab
         };
         Object.keys(TAG_CONFIG).forEach(tagName => {
-            extension_settings.text_styling.tags[tagName] = { ...TAG_CONFIG[tagName].defaults };
+            extensionSettings.text_styling.tags[tagName] = { ...TAG_CONFIG[tagName].defaults };
         });
     }
 
@@ -187,7 +187,7 @@ function initTextStyling() {
         tabContents.querySelectorAll('.tab-content').forEach(content => content.classList.toggle('active', content.dataset.tabContent === tabId));
     }
 
-    // --- メッセージ要素へのスタイル適用処理 ---
+    // --- 統合されたスタイル適用関数 ---
     function applyStylesToMessage(mesTextElement) {
         if (!mesTextElement) return;
         Object.keys(TAG_CONFIG).forEach(tagName => {
@@ -196,10 +196,6 @@ function initTextStyling() {
                 mesTextElement.classList.toggle(`style-${tagName}-enabled`, isEnabled);
             }
         });
-    }
-
-    function applyStylesToAllMessages() {
-        document.querySelectorAll('#chat .mes_text').forEach(applyStylesToMessage);
     }
 
     // --- コントロール変更時のメイン処理 ---
@@ -234,7 +230,7 @@ function initTextStyling() {
             rootStyle.setProperty(`--${tagName}-outline-rgb`, hexToRgb(outlineColor));
         }
 
-        applyStylesToAllMessages();
+        document.querySelectorAll('#chat .mes_text').forEach(applyStylesToMessage);
         saveSettings();
     }
 
@@ -245,38 +241,42 @@ function initTextStyling() {
         saveSettings();
     }
 
-    // --- SillyTavern EventSource イベントリスナー登録 (MutationObserverの代替) ---
-    function setupEventListeners() {
-        if (!eventSource || !eventTypes) {
-            console.warn('[Text Styling] eventSource または eventTypes が定義されていません。');
-            return;
-        }
+    // --- オブザーバーセットアップ ---
+    function setupObservers() {
+        if (chatObserver) chatObserver.disconnect();
+        const chatElement = document.getElementById('chat');
+        if (!chatElement) return;
 
-        // メッセージ生成時・描画時・チャット切替時にスタイルを自動適用
-        eventSource.on(eventTypes.CHARACTER_MESSAGE_RENDERED, applyStylesToAllMessages);
-        eventSource.on(eventTypes.USER_MESSAGE_RENDERED, applyStylesToAllMessages);
-        eventSource.on(eventTypes.MESSAGE_UPDATED, applyStylesToAllMessages);
-        eventSource.on(eventTypes.CHAT_CHANGED, applyStylesToAllMessages);
-
-        console.log('[Text Styling] SillyTavern EventSource リスナーを登録しました。');
+        chatObserver = new MutationObserver(mutations => {
+            for (const mutation of mutations) {
+                for (const node of mutation.addedNodes) {
+                    if (node.nodeType === 1) {
+                        const targets = node.classList.contains('mes_text') ? [node] : node.querySelectorAll('.mes_text');
+                        targets.forEach(applyStylesToMessage);
+                    }
+                }
+            }
+        });
+        chatObserver.observe(chatElement, { childList: true, subtree: true });
+        console.log("チャット監視オブザーバーをセットアップしました。");
     }
 
-    // --- 設定の保存と復元 ---
+    // --- 設定の保存と復元 (extensionSettings & saveSettingsDebounced 移行版) ---
     function saveSettings() {
-        if (!extension_settings.text_styling) {
-            extension_settings.text_styling = { tags: {} };
+        if (!extensionSettings.text_styling) {
+            extensionSettings.text_styling = { tags: {} };
         }
 
-        extension_settings.text_styling.chatWindowOpacity = parseFloat(controls.chatOpacityInput.value) / 100;
-        extension_settings.text_styling.panelMinimized = panel.classList.contains("hidden");
-        extension_settings.text_styling.activeTab = tabButtons.querySelector(".tab-button.active")?.dataset.tab || "p";
+        extensionSettings.text_styling.chatWindowOpacity = parseFloat(controls.chatOpacityInput.value) / 100;
+        extensionSettings.text_styling.panelMinimized = panel.classList.contains("hidden");
+        extensionSettings.text_styling.activeTab = tabButtons.querySelector(".tab-button.active")?.dataset.tab || "p";
 
         Object.keys(TAG_CONFIG).forEach(tagName => {
             const t = controls[tagName];
-            if (!extension_settings.text_styling.tags) {
-                extension_settings.text_styling.tags = {};
+            if (!extensionSettings.text_styling.tags) {
+                extensionSettings.text_styling.tags = {};
             }
-            extension_settings.text_styling.tags[tagName] = {
+            extensionSettings.text_styling.tags[tagName] = {
                 enabled: t.enabledCheckbox.checked,
                 fontSize: parseInt(t.fontSizeInput.value),
                 fontWeight: parseInt(t.fontWeightInput.value),
@@ -288,11 +288,12 @@ function initTextStyling() {
             };
         });
 
+        // サーバー側へ保存を依頼
         saveSettingsDebounced();
     }
 
     function restoreSettings() {
-        const settings = extension_settings.text_styling;
+        const settings = extensionSettings.text_styling;
         if (settings) {
             try {
                 Object.keys(TAG_CONFIG).forEach(tagName => {
@@ -324,8 +325,9 @@ function initTextStyling() {
             setDefaultSettings();
         }
 
+        // 起動時にすべてのスタイルを適用
         const originalSave = saveSettings;
-        saveSettings = () => {};
+        saveSettings = () => {}; // 復元中の不要な保存を抑制
         Object.keys(TAG_CONFIG).forEach(tagName => updateStyleAndAllMessages(tagName));
         updateChatWindowOpacity();
         saveSettings = originalSave;
@@ -418,7 +420,7 @@ function initTextStyling() {
         }
 
         restoreSettings();
-        setupEventListeners();
+        setupObservers();
     }, 500);
 }
 
