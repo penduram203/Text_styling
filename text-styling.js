@@ -1,5 +1,5 @@
-import { getContext, eventSource, event_types } from '../../../../script.js';
-import { extension_settings, saveSettingsDebounced } from '../../../../extensions.js';
+import { getContext, eventSource, event_types } from '/script.js';
+import { extension_settings, saveSettingsDebounced } from '/extensions.js';
 
 function initTextStyling() {
     console.log('テキストスタイル拡張機能 (EventSource版): 初期化開始');
