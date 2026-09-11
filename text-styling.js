@@ -1,4 +1,5 @@
-import { extensionSettings, saveSettingsDebounced, eventSource, eventTypes } from '../../../../script.js';
+import { getContext, eventSource, event_types } from '../../../../script.js';
+import { extension_settings, saveSettingsDebounced } from '../../../../extensions.js';
 
 function initTextStyling() {
     console.log('テキストスタイル拡張機能 (EventSource版): 初期化開始');
@@ -29,16 +30,16 @@ function initTextStyling() {
 
     const controls = {};
 
-    // 初期設定が extensionSettings になければデフォルトを割り当て
-    if (!extensionSettings.text_styling) {
-        extensionSettings.text_styling = {
+    // 初期設定が extension_settings になければデフォルトを割り当て
+    if (!extension_settings.text_styling) {
+        extension_settings.text_styling = {
             tags: {},
             chatWindowOpacity: OTHER_DEFAULTS.chatWindowOpacity,
             panelMinimized: OTHER_DEFAULTS.panelMinimized,
             activeTab: OTHER_DEFAULTS.activeTab
         };
         Object.keys(TAG_CONFIG).forEach(tagName => {
-            extensionSettings.text_styling.tags[tagName] = { ...TAG_CONFIG[tagName].defaults };
+            extension_settings.text_styling.tags[tagName] = { ...TAG_CONFIG[tagName].defaults };
         });
     }
 
@@ -262,20 +263,20 @@ function initTextStyling() {
 
     // --- 設定の保存と復元 ---
     function saveSettings() {
-        if (!extensionSettings.text_styling) {
-            extensionSettings.text_styling = { tags: {} };
+        if (!extension_settings.text_styling) {
+            extension_settings.text_styling = { tags: {} };
         }
 
-        extensionSettings.text_styling.chatWindowOpacity = parseFloat(controls.chatOpacityInput.value) / 100;
-        extensionSettings.text_styling.panelMinimized = panel.classList.contains("hidden");
-        extensionSettings.text_styling.activeTab = tabButtons.querySelector(".tab-button.active")?.dataset.tab || "p";
+        extension_settings.text_styling.chatWindowOpacity = parseFloat(controls.chatOpacityInput.value) / 100;
+        extension_settings.text_styling.panelMinimized = panel.classList.contains("hidden");
+        extension_settings.text_styling.activeTab = tabButtons.querySelector(".tab-button.active")?.dataset.tab || "p";
 
         Object.keys(TAG_CONFIG).forEach(tagName => {
             const t = controls[tagName];
-            if (!extensionSettings.text_styling.tags) {
-                extensionSettings.text_styling.tags = {};
+            if (!extension_settings.text_styling.tags) {
+                extension_settings.text_styling.tags = {};
             }
-            extensionSettings.text_styling.tags[tagName] = {
+            extension_settings.text_styling.tags[tagName] = {
                 enabled: t.enabledCheckbox.checked,
                 fontSize: parseInt(t.fontSizeInput.value),
                 fontWeight: parseInt(t.fontWeightInput.value),
@@ -291,7 +292,7 @@ function initTextStyling() {
     }
 
     function restoreSettings() {
-        const settings = extensionSettings.text_styling;
+        const settings = extension_settings.text_styling;
         if (settings) {
             try {
                 Object.keys(TAG_CONFIG).forEach(tagName => {
