@@ -3,19 +3,18 @@ function initTextStyling() {
     console.log('テキストスタイル拡張機能 (修正版): 初期化開始');
 
     const MODULE_NAME = 'text_styling';
-    const OLD_STORAGE_KEY = 'textStylingSettings_v6_modified'; // 旧localStorage版からの移行用
+    const OLD_STORAGE_KEY = 'textStylingSettings_v6_modified';
 
-    // P と Q のみ（em は廃止）
     const TAG_CONFIG = {
         p: {
             label: '通常テキスト',
             isDynamic: false,
-            defaults: { enabled: true, fontSize: 100, fontWeight: 400, textColor: '#dddddd', outlineColor: '#000000', outlineWidth: 1, lineHeight: 1.5, textOpacity: 1.0 }
+            defaults: { enabled: true, fontSize: 100, fontWeight: 400, textColor: '#dddddd', outlineColor: '#000000', outlineWidth: 1, lineHeight: 1.5, letterSpacing: 0, textOpacity: 1.0 }
         },
         q: {
             label: 'セリフ',
             isDynamic: false,
-            defaults: { enabled: true, fontSize: 100, fontWeight: 400, textColor: '#dddddd', outlineColor: '#000000', outlineWidth: 1, lineHeight: 1.5, textOpacity: 1.0 }
+            defaults: { enabled: true, fontSize: 100, fontWeight: 400, textColor: '#dddddd', outlineColor: '#000000', outlineWidth: 1, lineHeight: 1.5, letterSpacing: 0, textOpacity: 1.0 }
         }
     };
 
@@ -28,7 +27,6 @@ function initTextStyling() {
     const controls = {};
     let chatObserver = null;
 
-    // SillyTavern context を取得するヘルパー（存在しない場合はnull）
     function getSTContext() {
         return (window.SillyTavern && typeof window.SillyTavern.getContext === 'function')
             ? window.SillyTavern.getContext()
@@ -40,12 +38,8 @@ function initTextStyling() {
         return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '0, 0, 0';
     }
 
-    // --- 「」で囲まれたテキストを span.stj-dialogue でラップする（冪等） ---
     function ensureDialogueWrapped(mesTextEl) {
         if (!mesTextEl) return;
-
-        // TreeWalker で「」を含むテキストノードを検出
-        // ただし .stj-dialogue の子孫は既にラップ済みなので除外
         const walker = document.createTreeWalker(mesTextEl, NodeFilter.SHOW_TEXT, {
             acceptNode: (node) => {
                 let p = node.parentNode;
@@ -84,7 +78,6 @@ function initTextStyling() {
             if (last < txt.length) {
                 parts.push({ text: txt.slice(last), isDialogue: false });
             }
-            // 「」が無い or 変化なしならスキップ
             if (parts.length === 1 && !parts[0].isDialogue) return;
 
             const frag = document.createDocumentFragment();
@@ -157,6 +150,10 @@ function initTextStyling() {
                         <input type="range" id="${tagName}-line-height" min="1.0" max="3.0" step="0.1">
                     </div>
                     <div class="text-styling-control-group">
+                        <label for="${tagName}-letter-spacing">字間: <span id="${tagName}-letter-spacing-value"></span>px</label>
+                        <input type="range" id="${tagName}-letter-spacing" min="-5" max="20" step="0.5">
+                    </div>
+                    <div class="text-styling-control-group">
                         <label for="${tagName}-text-opacity">透過度: <span id="${tagName}-text-opacity-value"></span>%</label>
                         <input type="range" id="${tagName}-text-opacity" min="0" max="100" step="1">
                     </div>
@@ -178,7 +175,6 @@ function initTextStyling() {
             </div>`;
     }
 
-    // P と Q のタブを生成
     Object.keys(TAG_CONFIG).forEach(tagName => {
         const button = document.createElement('button');
         button.className = 'tab-button';
@@ -201,6 +197,8 @@ function initTextStyling() {
             fontWeightValue: content.querySelector(`#${tagName}-font-weight-value`),
             lineHeightInput: content.querySelector(`#${tagName}-line-height`),
             lineHeightValue: content.querySelector(`#${tagName}-line-height-value`),
+            letterSpacingInput: content.querySelector(`#${tagName}-letter-spacing`),
+            letterSpacingValue: content.querySelector(`#${tagName}-letter-spacing-value`),
             textColorInput: content.querySelector(`#${tagName}-text-color`),
             outlineColorInput: content.querySelector(`#${tagName}-outline-color`),
             outlineWidthInput: content.querySelector(`#${tagName}-outline-width`),
@@ -244,12 +242,9 @@ function initTextStyling() {
         tabContents.querySelectorAll('.tab-content').forEach(content => content.classList.toggle('active', content.dataset.tabContent === tabId));
     }
 
-    // --- 統合されたスタイル適用関数 ---
     function applyStylesToMessage(mesTextElement) {
         if (!mesTextElement) return;
-        // まず「」テキストをラップ（冪等）
         ensureDialogueWrapped(mesTextElement);
-        // タグ別の有効/無効クラスを切替
         Object.keys(TAG_CONFIG).forEach(tagName => {
             if (!TAG_CONFIG[tagName].isDynamic) {
                 const isEnabled = controls[tagName].enabledCheckbox.checked;
@@ -258,7 +253,6 @@ function initTextStyling() {
         });
     }
 
-    // --- コントロール変更時のメイン処理 ---
     function updateStyleAndAllMessages(tagName) {
         const tagControls = controls[tagName];
         const rootStyle = document.documentElement.style;
@@ -269,6 +263,7 @@ function initTextStyling() {
             const fontSize = parseInt(tagControls.fontSizeInput.value);
             const fontWeight = parseInt(tagControls.fontWeightInput.value);
             const lineHeight = parseFloat(tagControls.lineHeightInput.value);
+            const letterSpacing = parseFloat(tagControls.letterSpacingInput.value);
             const textColor = tagControls.textColorInput.value;
             const outlineColor = tagControls.outlineColorInput.value;
             const outlineWidth = parseFloat(tagControls.outlineWidthInput.value);
@@ -277,12 +272,14 @@ function initTextStyling() {
             tagControls.fontSizeValue.textContent = fontSize;
             tagControls.fontWeightValue.textContent = fontWeight;
             tagControls.lineHeightValue.textContent = lineHeight.toFixed(1);
+            tagControls.letterSpacingValue.textContent = letterSpacing.toFixed(1);
             tagControls.outlineWidthValue.textContent = outlineWidth.toFixed(1);
             tagControls.textOpacityValue.textContent = Math.round(textOpacity * 100);
 
             rootStyle.setProperty(`--${tagName}-font-size`, `${fontSize}%`);
             rootStyle.setProperty(`--${tagName}-font-weight`, fontWeight);
             rootStyle.setProperty(`--${tagName}-line-height`, lineHeight);
+            rootStyle.setProperty(`--${tagName}-letter-spacing`, `${letterSpacing}px`);
             rootStyle.setProperty(`--${tagName}-text-rgb`, hexToRgb(textColor));
             rootStyle.setProperty(`--${tagName}-text-opacity`, textOpacity);
             rootStyle.setProperty(`--${tagName}-outline-width`, `${outlineWidth}px`);
@@ -300,13 +297,11 @@ function initTextStyling() {
         saveSettings();
     }
 
-    // --- オブザーバーセットアップ（新規メッセージ・更新の自動処理） ---
     function setupObservers() {
         if (chatObserver) chatObserver.disconnect();
         const chatElement = document.getElementById('chat');
         if (!chatElement) return;
 
-        // 処理対象の .mes_text をまとめて再処理するデバウンス用
         const pending = new Set();
         let timer = null;
 
@@ -343,7 +338,6 @@ function initTextStyling() {
         console.log("チャット監視オブザーバーをセットアップしました。");
     }
 
-    // --- 設定の保存と復元 ---
     function saveSettings() {
         const settings = {
             tags: {},
@@ -358,6 +352,7 @@ function initTextStyling() {
                 fontSize: parseInt(t.fontSizeInput.value),
                 fontWeight: parseInt(t.fontWeightInput.value),
                 lineHeight: parseFloat(t.lineHeightInput.value),
+                letterSpacing: parseFloat(t.letterSpacingInput.value),
                 textColor: t.textColorInput.value,
                 outlineColor: t.outlineColorInput.value,
                 outlineWidth: parseFloat(t.outlineWidthInput.value),
@@ -380,7 +375,6 @@ function initTextStyling() {
         const context = getSTContext();
         let settings = context && context.extensionSettings ? context.extensionSettings[MODULE_NAME] : null;
 
-        // 旧localStorage版からの自動マイグレーション
         if (!settings) {
             const oldSaved = localStorage.getItem(OLD_STORAGE_KEY);
             if (oldSaved) {
@@ -410,6 +404,7 @@ function initTextStyling() {
                     tagControls.fontSizeInput.value = savedTag.fontSize ?? defaultTag.fontSize;
                     tagControls.fontWeightInput.value = savedTag.fontWeight ?? defaultTag.fontWeight;
                     tagControls.lineHeightInput.value = savedTag.lineHeight ?? defaultTag.lineHeight;
+                    tagControls.letterSpacingInput.value = savedTag.letterSpacing ?? defaultTag.letterSpacing;
                     tagControls.textColorInput.value = savedTag.textColor ?? defaultTag.textColor;
                     tagControls.outlineColorInput.value = savedTag.outlineColor ?? defaultTag.outlineColor;
                     tagControls.outlineWidthInput.value = savedTag.outlineWidth ?? defaultTag.outlineWidth;
@@ -428,12 +423,10 @@ function initTextStyling() {
             setDefaultSettings();
         }
 
-        // 起動時にすべてのスタイルを適用（復元中の不要な保存を抑制）
         const originalSave = saveSettings;
         saveSettings = () => {};
         Object.keys(TAG_CONFIG).forEach(tagName => updateStyleAndAllMessages(tagName));
         updateChatWindowOpacity();
-        // 既存メッセージに「」ラップを適用
         document.querySelectorAll('#chat .mes_text').forEach(applyStylesToMessage);
         saveSettings = originalSave;
     }
@@ -470,7 +463,6 @@ function initTextStyling() {
         saveSettings = originalSave;
     }
 
-    // --- 初期化処理 ---
     setTimeout(() => {
         console.log('拡張機能の初期化処理を開始');
 
