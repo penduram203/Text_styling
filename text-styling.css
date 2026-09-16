@@ -188,13 +188,14 @@
 }
 
 /* ▼▼▼ 通常テキスト (P) 用スタイル ▼▼▼ */
+
+/* P の視覚スタイルは .mes_text 全体に適用（継承させる） */
 #chat .mes_text.style-p-enabled {
   color: rgba(var(--p-text-rgb), var(--p-text-opacity)) !important;
   font-size: var(--p-font-size) !important;
   font-weight: var(--p-font-weight) !important;
   line-height: var(--p-line-height) !important;
   letter-spacing: var(--p-letter-spacing) !important;
-  margin-bottom: var(--p-bottom-margin) !important;   /* ★ 追加：下余白 */
   -webkit-text-stroke-width: var(--p-outline-width);
   -webkit-text-stroke-color: rgba(var(--p-outline-rgb), var(--p-text-opacity));
   paint-order: stroke fill;
@@ -211,6 +212,21 @@
   paint-order: stroke fill;
 }
 
+/* ★ 各段落 <p> の下に P 余白を適用 */
+#chat .mes_text.style-p-enabled p {
+  margin-bottom: var(--p-bottom-margin) !important;
+}
+
+/* ★ <p> を持たないメッセージ（主にユーザー入力）にのみ .mes_text 自体へ P 余白 */
+#chat .mes_text.style-p-enabled:not(:has(p)) {
+  margin-bottom: var(--p-bottom-margin) !important;
+}
+
+/* ★ P と Q が両方有効な時、セリフを含む <p> は P 余白を 0 にリセット（Q 余白に任せる） */
+#chat .mes_text.style-p-enabled.style-q-enabled p:has(.stj-dialogue) {
+  margin-bottom: 0 !important;
+}
+
 /* ▼▼▼ セリフ (Q) 用スタイル ▼▼▼ */
 #chat .mes_text.style-q-enabled q,
 #chat .mes_text.style-q-enabled .stj-dialogue {
@@ -220,7 +236,6 @@
   font-weight: var(--q-font-weight) !important;
   line-height: var(--q-line-height) !important;
   letter-spacing: var(--q-letter-spacing) !important;
-  /* ★ 上下左右の margin を維持しつつ、下余白のみ変数化 */
   margin: 0 0 var(--q-bottom-margin) 0 !important;
   padding: 0;
   -webkit-text-stroke-width: var(--q-outline-width);
