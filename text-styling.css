@@ -10,7 +10,7 @@
   --p-outline-width: 1px;
   --p-outline-rgb: 0, 0, 0;
 
-  /* q タグ（セリフ：「」で囲まれたテキスト）用変数 */
+  /* q タグ（セリフ）用変数 */
   --q-font-size: 100%;
   --q-font-weight: 400;
   --q-line-height: 1.5;
@@ -59,9 +59,7 @@
   margin: -15px -15px 15px -15px;
 }
 
-.tab-container {
-  margin-bottom: 15px;
-}
+.tab-container { margin-bottom: 15px; }
 
 .tab-buttons {
   display: flex;
@@ -96,9 +94,7 @@
   border-bottom-right-radius: 4px;
 }
 
-.tab-content.active {
-  display: block;
-}
+.tab-content.active { display: block; }
 
 .tab-content.disabled .columns-container {
   opacity: 0.5;
@@ -127,18 +123,10 @@
   gap: 15px;
 }
 
-.column {
-  flex: 1;
-  min-width: 200px;
-}
+.column { flex: 1; min-width: 200px; }
 
-.text-styling-control-group {
-  margin-bottom: 12px;
-}
-
-.text-styling-control-group:last-child {
-  margin-bottom: 0;
-}
+.text-styling-control-group { margin-bottom: 12px; }
+.text-styling-control-group:last-child { margin-bottom: 0; }
 
 .text-styling-control-group label {
   display: block;
@@ -148,9 +136,7 @@
 }
 
 .text-styling-control-group input[type="color"],
-.text-styling-control-group input[type="range"] {
-  width: 100%;
-}
+.text-styling-control-group input[type="range"] { width: 100%; }
 
 .text-styling-value-display {
   display: inline-block;
@@ -187,9 +173,9 @@
   background-color: #444;
 }
 
-/* ▼▼▼ 通常テキスト (P) 用スタイル ▼▼▼ */
-
-/* P の視覚スタイルは .mes_text 全体に適用（継承させる） */
+/* ============================================================
+   ▼ 通常テキスト (P) の視覚スタイル：.mes_text 全体に継承
+   ============================================================ */
 #chat .mes_text.style-p-enabled {
   color: rgba(var(--p-text-rgb), var(--p-text-opacity)) !important;
   font-size: var(--p-font-size) !important;
@@ -212,22 +198,19 @@
   paint-order: stroke fill;
 }
 
-/* ★ 各段落 <p> の下に P 余白を適用 */
-#chat .mes_text.style-p-enabled p {
-  margin-bottom: var(--p-bottom-margin) !important;
+/* ============================================================
+   ▼ 通常テキストセグメント（P余白）
+   display:block で独立したブロックにして、P余白を各セグメントに適用
+   ============================================================ */
+#chat .mes_text.style-p-enabled .stj-normal-text {
+  display: block !important;
+  margin: 0 0 var(--p-bottom-margin) 0 !important;
+  padding: 0;
 }
 
-/* ★ <p> を持たないメッセージ（主にユーザー入力）にのみ .mes_text 自体へ P 余白 */
-#chat .mes_text.style-p-enabled:not(:has(p)) {
-  margin-bottom: var(--p-bottom-margin) !important;
-}
-
-/* ★ P と Q が両方有効な時、セリフを含む <p> は P 余白を 0 にリセット（Q 余白に任せる） */
-#chat .mes_text.style-p-enabled.style-q-enabled p:has(.stj-dialogue) {
-  margin-bottom: 0 !important;
-}
-
-/* ▼▼▼ セリフ (Q) 用スタイル ▼▼▼ */
+/* ============================================================
+   ▼ セリフ (Q) の視覚スタイル
+   ============================================================ */
 #chat .mes_text.style-q-enabled q,
 #chat .mes_text.style-q-enabled .stj-dialogue {
   display: block;
@@ -253,6 +236,21 @@
   -webkit-text-stroke-width: var(--q-outline-width);
   -webkit-text-stroke-color: rgba(var(--q-outline-rgb), var(--q-text-opacity));
   paint-order: stroke fill;
+}
+
+/* ============================================================
+   ▼ <p> の P余白は「セグメントスパンを含まない場合のみ」
+   ============================================================ */
+#chat .mes_text.style-p-enabled p {
+  margin-bottom: var(--p-bottom-margin) !important;
+}
+#chat .mes_text.style-p-enabled p.stj-has-segment {
+  margin-bottom: 0 !important;
+}
+
+/* <p> もセグメントも持たない .mes_text（ユーザー短文など） */
+#chat .mes_text.style-p-enabled.stj-empty-text {
+  margin-bottom: var(--p-bottom-margin) !important;
 }
 
 /* チャットウィンドウ透過 */
