@@ -184,11 +184,9 @@
 }
 
 /* ▼▼▼ 通常テキスト (P) 用スタイル ▼▼▼ */
-/* .mes_text 要素自体にも適用することで、<p> タグの有無に関わらず
-   ユーザーメッセージ・AI メッセージの両方に同じスタイルを適用する。
-   .stj-dialogue は後続の Q ルールで上書きされる。 */
-#chat .mes_text.style-p-enabled,
-#chat .mes_text.style-p-enabled * {
+/* ルート要素 .mes_text に font-size を一度だけ適用。
+   子孫には 1em を強制して、パーセント値の乗算（コンパウンド）を防止する。 */
+#chat .mes_text.style-p-enabled {
   color: rgba(var(--p-text-rgb), var(--p-text-opacity)) !important;
   font-size: var(--p-font-size) !important;
   font-weight: var(--p-font-weight) !important;
@@ -198,16 +196,37 @@
   paint-order: stroke fill;
 }
 
+#chat .mes_text.style-p-enabled * {
+  color: rgba(var(--p-text-rgb), var(--p-text-opacity)) !important;
+  font-size: 1em !important;       /* 親と同じサイズを強制（乗算防止） */
+  font-weight: var(--p-font-weight) !important;
+  line-height: inherit !important; /* 行間も乗算させない */
+  -webkit-text-stroke-width: var(--p-outline-width);
+  -webkit-text-stroke-color: rgba(var(--p-outline-rgb), var(--p-text-opacity));
+  paint-order: stroke fill;
+}
+
 /* ▼▼▼ セリフ (Q) 用スタイル ▼▼▼ */
-/* 「」で囲まれたテキストは JS によって .stj-dialogue クラスを持つ span にラップされる。
-   Q のセレクタは P より特異性が高い（クラス数が多い）ため、P を上書きできる。 */
+/* 「」で囲まれたテキストは JS により .stj-dialogue クラスを持つ span にラップされる。
+   Q のセレクタは P より特異性が高いため、P の 1em を上書きできる。 */
 #chat .mes_text.style-q-enabled q,
-#chat .mes_text.style-q-enabled .stj-dialogue,
-#chat .mes_text.style-q-enabled .stj-dialogue * {
+#chat .mes_text.style-q-enabled .stj-dialogue {
   color: rgba(var(--q-text-rgb), var(--q-text-opacity)) !important;
   font-size: var(--q-font-size) !important;
   font-weight: var(--q-font-weight) !important;
   line-height: var(--q-line-height) !important;
+  -webkit-text-stroke-width: var(--q-outline-width);
+  -webkit-text-stroke-color: rgba(var(--q-outline-rgb), var(--q-text-opacity));
+  paint-order: stroke fill;
+}
+
+/* Q の子孫も同様に 1em を強制して乗算を防止 */
+#chat .mes_text.style-q-enabled q *,
+#chat .mes_text.style-q-enabled .stj-dialogue * {
+  color: rgba(var(--q-text-rgb), var(--q-text-opacity)) !important;
+  font-size: 1em !important;
+  font-weight: var(--q-font-weight) !important;
+  line-height: inherit !important;
   -webkit-text-stroke-width: var(--q-outline-width);
   -webkit-text-stroke-color: rgba(var(--q-outline-rgb), var(--q-text-opacity));
   paint-order: stroke fill;
