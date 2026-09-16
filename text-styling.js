@@ -9,12 +9,12 @@ function initTextStyling() {
         p: {
             label: '通常テキスト',
             isDynamic: false,
-            defaults: { enabled: true, fontSize: 100, fontWeight: 400, textColor: '#dddddd', outlineColor: '#000000', outlineWidth: 1, lineHeight: 1.5, letterSpacing: 0, textOpacity: 1.0 }
+            defaults: { enabled: true, fontSize: 100, fontWeight: 400, textColor: '#dddddd', outlineColor: '#000000', outlineWidth: 1, lineHeight: 1.5, letterSpacing: 0, bottomMargin: 0, textOpacity: 1.0 }
         },
         q: {
             label: 'セリフ',
             isDynamic: false,
-            defaults: { enabled: true, fontSize: 100, fontWeight: 400, textColor: '#dddddd', outlineColor: '#000000', outlineWidth: 1, lineHeight: 1.5, letterSpacing: 0, textOpacity: 1.0 }
+            defaults: { enabled: true, fontSize: 100, fontWeight: 400, textColor: '#dddddd', outlineColor: '#000000', outlineWidth: 1, lineHeight: 1.5, letterSpacing: 0, bottomMargin: 0, textOpacity: 1.0 }
         }
     };
 
@@ -171,6 +171,10 @@ function initTextStyling() {
                         <label for="${tagName}-outline-width">縁取り幅: <span id="${tagName}-outline-width-value"></span>px</label>
                         <input type="range" id="${tagName}-outline-width" min="0" max="10" step="0.5">
                     </div>
+                    <div class="text-styling-control-group">
+                        <label for="${tagName}-bottom-margin">下余白: <span id="${tagName}-bottom-margin-value"></span>px</label>
+                        <input type="range" id="${tagName}-bottom-margin" min="0" max="200" step="1">
+                    </div>
                 </div>
             </div>`;
     }
@@ -199,6 +203,8 @@ function initTextStyling() {
             lineHeightValue: content.querySelector(`#${tagName}-line-height-value`),
             letterSpacingInput: content.querySelector(`#${tagName}-letter-spacing`),
             letterSpacingValue: content.querySelector(`#${tagName}-letter-spacing-value`),
+            bottomMarginInput: content.querySelector(`#${tagName}-bottom-margin`),
+            bottomMarginValue: content.querySelector(`#${tagName}-bottom-margin-value`),
             textColorInput: content.querySelector(`#${tagName}-text-color`),
             outlineColorInput: content.querySelector(`#${tagName}-outline-color`),
             outlineWidthInput: content.querySelector(`#${tagName}-outline-width`),
@@ -264,6 +270,7 @@ function initTextStyling() {
             const fontWeight = parseInt(tagControls.fontWeightInput.value);
             const lineHeight = parseFloat(tagControls.lineHeightInput.value);
             const letterSpacing = parseFloat(tagControls.letterSpacingInput.value);
+            const bottomMargin = parseInt(tagControls.bottomMarginInput.value);
             const textColor = tagControls.textColorInput.value;
             const outlineColor = tagControls.outlineColorInput.value;
             const outlineWidth = parseFloat(tagControls.outlineWidthInput.value);
@@ -273,6 +280,7 @@ function initTextStyling() {
             tagControls.fontWeightValue.textContent = fontWeight;
             tagControls.lineHeightValue.textContent = lineHeight.toFixed(1);
             tagControls.letterSpacingValue.textContent = letterSpacing.toFixed(1);
+            tagControls.bottomMarginValue.textContent = bottomMargin;
             tagControls.outlineWidthValue.textContent = outlineWidth.toFixed(1);
             tagControls.textOpacityValue.textContent = Math.round(textOpacity * 100);
 
@@ -280,6 +288,7 @@ function initTextStyling() {
             rootStyle.setProperty(`--${tagName}-font-weight`, fontWeight);
             rootStyle.setProperty(`--${tagName}-line-height`, lineHeight);
             rootStyle.setProperty(`--${tagName}-letter-spacing`, `${letterSpacing}px`);
+            rootStyle.setProperty(`--${tagName}-bottom-margin`, `${bottomMargin}px`);
             rootStyle.setProperty(`--${tagName}-text-rgb`, hexToRgb(textColor));
             rootStyle.setProperty(`--${tagName}-text-opacity`, textOpacity);
             rootStyle.setProperty(`--${tagName}-outline-width`, `${outlineWidth}px`);
@@ -353,6 +362,7 @@ function initTextStyling() {
                 fontWeight: parseInt(t.fontWeightInput.value),
                 lineHeight: parseFloat(t.lineHeightInput.value),
                 letterSpacing: parseFloat(t.letterSpacingInput.value),
+                bottomMargin: parseInt(t.bottomMarginInput.value),
                 textColor: t.textColorInput.value,
                 outlineColor: t.outlineColorInput.value,
                 outlineWidth: parseFloat(t.outlineWidthInput.value),
@@ -405,6 +415,7 @@ function initTextStyling() {
                     tagControls.fontWeightInput.value = savedTag.fontWeight ?? defaultTag.fontWeight;
                     tagControls.lineHeightInput.value = savedTag.lineHeight ?? defaultTag.lineHeight;
                     tagControls.letterSpacingInput.value = savedTag.letterSpacing ?? defaultTag.letterSpacing;
+                    tagControls.bottomMarginInput.value = savedTag.bottomMargin ?? defaultTag.bottomMargin;
                     tagControls.textColorInput.value = savedTag.textColor ?? defaultTag.textColor;
                     tagControls.outlineColorInput.value = savedTag.outlineColor ?? defaultTag.outlineColor;
                     tagControls.outlineWidthInput.value = savedTag.outlineWidth ?? defaultTag.outlineWidth;
