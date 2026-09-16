@@ -1,25 +1,19 @@
-// 修正版: 静的import（'../../../../script.js' から extensionSettings / eventTypes などを
-// 取得しようとしていた箇所）は、そもそも存在しないエクスポート名だったため読み込みに失敗していた。
-// SillyTavern.getContext() を実行時に呼び出す方式（公式ドキュメント推奨）に統一する。
+// SillyTavern.getContext() を実行時に呼び出す方式（公式ドキュメント推奨）
 function initTextStyling() {
     console.log('テキストスタイル拡張機能 (修正版): 初期化開始');
 
     const MODULE_NAME = 'text_styling';
     const OLD_STORAGE_KEY = 'textStylingSettings_v6_modified'; // 旧localStorage版からの移行用
 
+    // P と Q のみ（em は廃止）
     const TAG_CONFIG = {
         p: {
-            label: 'P',
+            label: '通常テキスト',
             isDynamic: false,
             defaults: { enabled: true, fontSize: 100, fontWeight: 400, textColor: '#dddddd', outlineColor: '#000000', outlineWidth: 1, lineHeight: 1.5, textOpacity: 1.0 }
         },
         q: {
-            label: 'Q',
-            isDynamic: false,
-            defaults: { enabled: true, fontSize: 100, fontWeight: 400, textColor: '#dddddd', outlineColor: '#000000', outlineWidth: 1, lineHeight: 1.5, textOpacity: 1.0 }
-        },
-        em: {
-            label: 'EM',
+            label: 'セリフ',
             isDynamic: false,
             defaults: { enabled: true, fontSize: 100, fontWeight: 400, textColor: '#dddddd', outlineColor: '#000000', outlineWidth: 1, lineHeight: 1.5, textOpacity: 1.0 }
         }
@@ -44,6 +38,70 @@ function initTextStyling() {
     function hexToRgb(hex) {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
         return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '0, 0, 0';
+    }
+
+    // --- 「」で囲まれたテキストを span.stj-dialogue でラップする（冪等） ---
+    function ensureDialogueWrapped(mesTextEl) {
+        if (!mesTextEl) return;
+
+        // TreeWalker で「」を含むテキストノードを検出
+        // ただし .stj-dialogue の子孫は既にラップ済みなので除外
+        const walker = document.createTreeWalker(mesTextEl, NodeFilter.SHOW_TEXT, {
+            acceptNode: (node) => {
+                let p = node.parentNode;
+                while (p && p !== mesTextEl) {
+                    if (p.classList && p.classList.contains('stj-dialogue')) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    p = p.parentNode;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        });
+
+        const textNodes = [];
+        let n;
+        while ((n = walker.nextNode())) {
+            textNodes.push(n);
+        }
+
+        textNodes.forEach(textNode => {
+            const txt = textNode.nodeValue;
+            if (!txt || txt.indexOf('「') < 0) return;
+
+            const regex = /「[^」]*」/g;
+            const parts = [];
+            let last = 0;
+            let m;
+            while ((m = regex.exec(txt)) !== null) {
+                if (m.index > last) {
+                    parts.push({ text: txt.slice(last, m.index), isDialogue: false });
+                }
+                parts.push({ text: m[0], isDialogue: true });
+                last = regex.lastIndex;
+            }
+            if (parts.length === 0) return;
+            if (last < txt.length) {
+                parts.push({ text: txt.slice(last), isDialogue: false });
+            }
+            // 「」が無い or 変化なしならスキップ
+            if (parts.length === 1 && !parts[0].isDialogue) return;
+
+            const frag = document.createDocumentFragment();
+            parts.forEach(part => {
+                if (part.isDialogue) {
+                    const span = document.createElement('span');
+                    span.className = 'stj-dialogue';
+                    span.textContent = part.text;
+                    frag.appendChild(span);
+                } else {
+                    frag.appendChild(document.createTextNode(part.text));
+                }
+            });
+            if (textNode.parentNode) {
+                textNode.parentNode.replaceChild(frag, textNode);
+            }
+        });
     }
 
     // --- UI生成 ---
@@ -120,6 +178,7 @@ function initTextStyling() {
             </div>`;
     }
 
+    // P と Q のタブを生成
     Object.keys(TAG_CONFIG).forEach(tagName => {
         const button = document.createElement('button');
         button.className = 'tab-button';
@@ -188,6 +247,9 @@ function initTextStyling() {
     // --- 統合されたスタイル適用関数 ---
     function applyStylesToMessage(mesTextElement) {
         if (!mesTextElement) return;
+        // まず「」テキストをラップ（冪等）
+        ensureDialogueWrapped(mesTextElement);
+        // タグ別の有効/無効クラスを切替
         Object.keys(TAG_CONFIG).forEach(tagName => {
             if (!TAG_CONFIG[tagName].isDynamic) {
                 const isEnabled = controls[tagName].enabledCheckbox.checked;
@@ -238,27 +300,50 @@ function initTextStyling() {
         saveSettings();
     }
 
-    // --- オブザーバーセットアップ（新規メッセージが追加された際に自動でスタイルを適用） ---
+    // --- オブザーバーセットアップ（新規メッセージ・更新の自動処理） ---
     function setupObservers() {
         if (chatObserver) chatObserver.disconnect();
         const chatElement = document.getElementById('chat');
         if (!chatElement) return;
 
+        // 処理対象の .mes_text をまとめて再処理するデバウンス用
+        const pending = new Set();
+        let timer = null;
+
+        function scheduleProcess(el) {
+            if (!el) return;
+            pending.add(el);
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => {
+                pending.forEach(x => applyStylesToMessage(x));
+                pending.clear();
+            }, 100);
+        }
+
         chatObserver = new MutationObserver(mutations => {
             for (const mutation of mutations) {
-                for (const node of mutation.addedNodes) {
-                    if (node.nodeType === 1) { // ELEMENT_NODE
-                        const targets = node.classList.contains('mes_text') ? [node] : node.querySelectorAll('.mes_text');
-                        targets.forEach(applyStylesToMessage);
+                if (mutation.type === 'characterData') {
+                    const parent = mutation.target.parentNode;
+                    const mesTextEl = parent && parent.closest ? parent.closest('.mes_text') : null;
+                    if (mesTextEl) scheduleProcess(mesTextEl);
+                } else if (mutation.type === 'childList') {
+                    for (const node of mutation.addedNodes) {
+                        if (node.nodeType === 1) {
+                            if (node.classList.contains('mes_text')) {
+                                scheduleProcess(node);
+                            } else if (node.querySelectorAll) {
+                                node.querySelectorAll('.mes_text').forEach(scheduleProcess);
+                            }
+                        }
                     }
                 }
             }
         });
-        chatObserver.observe(chatElement, { childList: true, subtree: true });
+        chatObserver.observe(chatElement, { childList: true, subtree: true, characterData: true });
         console.log("チャット監視オブザーバーをセットアップしました。");
     }
 
-    // --- 設定の保存と復元（SillyTavern extensionSettings 経由。取得不可時は localStorage にフォールバック） ---
+    // --- 設定の保存と復元 ---
     function saveSettings() {
         const settings = {
             tags: {},
@@ -348,6 +433,8 @@ function initTextStyling() {
         saveSettings = () => {};
         Object.keys(TAG_CONFIG).forEach(tagName => updateStyleAndAllMessages(tagName));
         updateChatWindowOpacity();
+        // 既存メッセージに「」ラップを適用
+        document.querySelectorAll('#chat .mes_text').forEach(applyStylesToMessage);
         saveSettings = originalSave;
     }
 
