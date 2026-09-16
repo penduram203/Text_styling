@@ -39,112 +39,102 @@ function initTextStyling() {
     }
 
     // ============================================================
-    //  セグメントのラップ処理
-    //  - 「」を含むテキストノード → セグメント分割して .stj-dialogue / .stj-normal-text でラップ
-    //  - 裸のテキストノード（「」なし）でも、兄弟に .stj-dialogue / .stj-normal-text があれば
-    //    .stj-normal-text でラップ（旧バージョンからの移行や部分ラップに対応）
+    //  セグメントのラップ処理（2パス方式）
+    //  Pass 1: 「」を含むテキストノードを .stj-dialogue / .stj-normal-text に分割
+    //  Pass 2: セグメントが1つでもあるメッセージ内の
+    //          裸の非空テキストノードを全て .stj-normal-text でラップ
+    //          → 処理順序に依存せず一貫性を保証
     // ============================================================
-    function hasSegmentSibling(textNode) {
-        let s = textNode.previousSibling;
-        while (s) {
-            if (s.nodeType === 1 && s.classList &&
-                (s.classList.contains('stj-dialogue') || s.classList.contains('stj-normal-text'))) {
-                return true;
-            }
-            s = s.previousSibling;
-        }
-        s = textNode.nextSibling;
-        while (s) {
-            if (s.nodeType === 1 && s.classList &&
-                (s.classList.contains('stj-dialogue') || s.classList.contains('stj-normal-text'))) {
-                return true;
-            }
-            s = s.nextSibling;
-        }
-        return false;
-    }
-
     function ensureSegmentsWrapped(mesTextEl) {
         if (!mesTextEl) return;
 
-        // ラップ対象のテキストノードを収集（既存スパンの内側は除外）
-        const walker = document.createTreeWalker(mesTextEl, NodeFilter.SHOW_TEXT, {
-            acceptNode: (node) => {
-                let p = node.parentNode;
-                while (p && p !== mesTextEl) {
-                    if (p.classList && (p.classList.contains('stj-dialogue') || p.classList.contains('stj-normal-text'))) {
-                        return NodeFilter.FILTER_REJECT;
-                    }
-                    p = p.parentNode;
+        // 既存のセグメント（.stj-dialogue / .stj-normal-text）の内側は除外
+        const rejectInsideSegments = (node) => {
+            let p = node.parentNode;
+            while (p && p !== mesTextEl) {
+                if (p.classList && (p.classList.contains('stj-dialogue') || p.classList.contains('stj-normal-text'))) {
+                    return NodeFilter.FILTER_REJECT;
                 }
-                return NodeFilter.FILTER_ACCEPT;
+                p = p.parentNode;
+            }
+            return NodeFilter.FILTER_ACCEPT;
+        };
+
+        // =====================================================
+        //  PASS 1: 「」を含むテキストノードをセグメントに分割
+        // =====================================================
+        const walker1 = document.createTreeWalker(mesTextEl, NodeFilter.SHOW_TEXT, { acceptNode: rejectInsideSegments });
+        const nodes1 = [];
+        let n1;
+        while ((n1 = walker1.nextNode())) nodes1.push(n1);
+
+        nodes1.forEach(textNode => {
+            const txt = textNode.nodeValue;
+            if (!txt || txt.indexOf('「') < 0) return;
+
+            const regex = /「[^」]*」/g;
+            const segments = [];
+            let last = 0;
+            let m;
+            let hasDialogue = false;
+            while ((m = regex.exec(txt)) !== null) {
+                hasDialogue = true;
+                if (m.index > last) {
+                    segments.push({ text: txt.slice(last, m.index), isDialogue: false });
+                }
+                segments.push({ text: m[0], isDialogue: true });
+                last = regex.lastIndex;
+            }
+            if (!hasDialogue) return;
+            if (last < txt.length) {
+                segments.push({ text: txt.slice(last), isDialogue: false });
+            }
+
+            const frag = document.createDocumentFragment();
+            segments.forEach(seg => {
+                if (seg.text === '') return;
+                // 空白だけの通常セグメントはテキストノードとして保持
+                if (!seg.isDialogue && seg.text.trim() === '') {
+                    frag.appendChild(document.createTextNode(seg.text));
+                    return;
+                }
+                const span = document.createElement('span');
+                span.className = seg.isDialogue ? 'stj-dialogue' : 'stj-normal-text';
+                span.textContent = seg.text;
+                frag.appendChild(span);
+            });
+            if (textNode.parentNode) {
+                textNode.parentNode.replaceChild(frag, textNode);
             }
         });
 
-        const textNodes = [];
-        let n;
-        while ((n = walker.nextNode())) {
-            textNodes.push(n);
-        }
+        // =====================================================
+        //  PASS 2: セグメントが1つでも存在するメッセージなら、
+        //          残った「裸の非空テキストノード」を全てラップ
+        //          → 処理順序に依存せず一貫性を保証
+        // =====================================================
+        const hasAnySegment = mesTextEl.querySelector('.stj-dialogue, .stj-normal-text');
+        if (hasAnySegment) {
+            const walker2 = document.createTreeWalker(mesTextEl, NodeFilter.SHOW_TEXT, { acceptNode: rejectInsideSegments });
+            const nodes2 = [];
+            let n2;
+            while ((n2 = walker2.nextNode())) nodes2.push(n2);
 
-        textNodes.forEach(textNode => {
-            const txt = textNode.nodeValue;
-            if (!txt) return;
-
-            const hasDialogueMarker = txt.indexOf('「') >= 0;
-
-            // --- パターン A: 「」を含むテキストノード ---
-            if (hasDialogueMarker) {
-                const regex = /「[^」]*」/g;
-                const segments = [];
-                let last = 0;
-                let m;
-                let hasDialogue = false;
-                while ((m = regex.exec(txt)) !== null) {
-                    hasDialogue = true;
-                    if (m.index > last) {
-                        segments.push({ text: txt.slice(last, m.index), isDialogue: false });
-                    }
-                    segments.push({ text: m[0], isDialogue: true });
-                    last = regex.lastIndex;
-                }
-                if (!hasDialogue) return;
-                if (last < txt.length) {
-                    segments.push({ text: txt.slice(last), isDialogue: false });
-                }
-
-                const frag = document.createDocumentFragment();
-                segments.forEach(seg => {
-                    if (seg.text === '') return;
-                    // 空白のみの通常セグメントはテキストノードとして保持
-                    if (!seg.isDialogue && seg.text.trim() === '') {
-                        frag.appendChild(document.createTextNode(seg.text));
-                        return;
-                    }
-                    const span = document.createElement('span');
-                    span.className = seg.isDialogue ? 'stj-dialogue' : 'stj-normal-text';
-                    span.textContent = seg.text;
-                    frag.appendChild(span);
-                });
-                if (textNode.parentNode) {
-                    textNode.parentNode.replaceChild(frag, textNode);
-                }
-                return;
-            }
-
-            // --- パターン B: 「」なしの裸のテキストノード ---
-            // 兄弟に既存のセグメントスパンがあれば .stj-normal-text でラップ
-            if (txt.trim() !== '' && hasSegmentSibling(textNode)) {
+            nodes2.forEach(textNode => {
+                const txt = textNode.nodeValue;
+                if (!txt || txt.trim() === '') return;
+                const parent = textNode.parentNode;
+                if (!parent) return;
                 const span = document.createElement('span');
                 span.className = 'stj-normal-text';
                 span.textContent = txt;
-                if (textNode.parentNode) {
-                    textNode.parentNode.replaceChild(span, textNode);
-                }
-            }
-        });
+                parent.replaceChild(span, textNode);
+            });
+        }
 
-        // ---- <p> に stj-has-segment クラスを付与（余白の二重適用を防止） ----
+        // =====================================================
+        //  <p> クラス更新：セグメントを含む <p> は P 余白を 0 に
+        // =====================================================
         mesTextEl.querySelectorAll('p').forEach(p => {
             if (p.querySelector('.stj-dialogue, .stj-normal-text')) {
                 p.classList.add('stj-has-segment');
@@ -153,10 +143,11 @@ function initTextStyling() {
             }
         });
 
-        // ---- <p> もセグメントもない .mes_text に stj-empty-text クラスを付与 ----
+        // =====================================================
+        //  <p> もセグメントも無いメッセージ（短文ユーザー入力など）
+        // =====================================================
         const hasP = mesTextEl.querySelector('p');
-        const hasSegment = mesTextEl.querySelector('.stj-dialogue, .stj-normal-text');
-        if (!hasP && !hasSegment) {
+        if (!hasP && !hasAnySegment) {
             mesTextEl.classList.add('stj-empty-text');
         } else {
             mesTextEl.classList.remove('stj-empty-text');
@@ -175,7 +166,7 @@ function initTextStyling() {
     header.textContent = 'テキストスタイル設定';
     panel.appendChild(header);
 
-    // ★ 左下の⚙アイコン（restoreButton）
+    // ★ 左下の⚙アイコン
     const restoreButton = document.createElement('button');
     restoreButton.id = 'restore-panel-button';
     restoreButton.innerHTML = '⚙';
