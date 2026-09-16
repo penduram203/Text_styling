@@ -184,9 +184,11 @@
 }
 
 /* ▼▼▼ 通常テキスト (P) 用スタイル ▼▼▼ */
-/* 「」で囲まれたテキスト（＝ .stj-dialogue）は除外する */
-#chat .mes_text.style-p-enabled p,
-#chat .mes_text.style-p-enabled p *:not(.stj-dialogue):not(.stj-dialogue *) {
+/* .mes_text 要素自体にも適用することで、<p> タグの有無に関わらず
+   ユーザーメッセージ・AI メッセージの両方に同じスタイルを適用する。
+   .stj-dialogue は後続の Q ルールで上書きされる。 */
+#chat .mes_text.style-p-enabled,
+#chat .mes_text.style-p-enabled * {
   color: rgba(var(--p-text-rgb), var(--p-text-opacity)) !important;
   font-size: var(--p-font-size) !important;
   font-weight: var(--p-font-weight) !important;
@@ -197,7 +199,8 @@
 }
 
 /* ▼▼▼ セリフ (Q) 用スタイル ▼▼▼ */
-/* 「」で囲まれたテキストは JS によって .stj-dialogue クラスを持つ span にラップされる */
+/* 「」で囲まれたテキストは JS によって .stj-dialogue クラスを持つ span にラップされる。
+   Q のセレクタは P より特異性が高い（クラス数が多い）ため、P を上書きできる。 */
 #chat .mes_text.style-q-enabled q,
 #chat .mes_text.style-q-enabled .stj-dialogue,
 #chat .mes_text.style-q-enabled .stj-dialogue * {
