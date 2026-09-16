@@ -3,6 +3,7 @@
   --p-font-size: 100%;
   --p-font-weight: 400;
   --p-line-height: 1.5;
+  --p-letter-spacing: 0px;
   --p-text-rgb: 221, 221, 221;
   --p-text-opacity: 1;
   --p-outline-width: 1px;
@@ -12,6 +13,7 @@
   --q-font-size: 100%;
   --q-font-weight: 400;
   --q-line-height: 1.5;
+  --q-letter-spacing: 0px;
   --q-text-rgb: 221, 221, 221;
   --q-text-opacity: 1;
   --q-outline-width: 1px;
@@ -184,13 +186,12 @@
 }
 
 /* ▼▼▼ 通常テキスト (P) 用スタイル ▼▼▼ */
-/* .mes_text の line-height が strut として通常行に作用。
-   子孫には 1em を強制してフォントサイズの乗算を防止。 */
 #chat .mes_text.style-p-enabled {
   color: rgba(var(--p-text-rgb), var(--p-text-opacity)) !important;
   font-size: var(--p-font-size) !important;
   font-weight: var(--p-font-weight) !important;
   line-height: var(--p-line-height) !important;
+  letter-spacing: var(--p-letter-spacing) !important;   /* ★ 追加 */
   -webkit-text-stroke-width: var(--p-outline-width);
   -webkit-text-stroke-color: rgba(var(--p-outline-rgb), var(--p-text-opacity));
   paint-order: stroke fill;
@@ -201,22 +202,21 @@
   font-size: 1em !important;
   font-weight: var(--p-font-weight) !important;
   line-height: inherit !important;
+  letter-spacing: inherit !important;                  /* ★ 追加：親から継承 */
   -webkit-text-stroke-width: var(--p-outline-width);
   -webkit-text-stroke-color: rgba(var(--p-outline-rgb), var(--p-text-opacity));
   paint-order: stroke fill;
 }
 
 /* ▼▼▼ セリフ (Q) 用スタイル ▼▼▼ */
-/* .stj-dialogue を display:block にすることで、独自のブロックを形成し、
-   親ブロック(P) の strut の影響を受けずに独立した line-height を持つ。
-   その結果、P と Q の行間が完全に分離される。 */
 #chat .mes_text.style-q-enabled q,
 #chat .mes_text.style-q-enabled .stj-dialogue {
-  display: block;                                   /* ★ 独立したブロック化 */
+  display: block;
   color: rgba(var(--q-text-rgb), var(--q-text-opacity)) !important;
   font-size: var(--q-font-size) !important;
   font-weight: var(--q-font-weight) !important;
-  line-height: var(--q-line-height) !important;    /* ★ P の strut の影響を受けない */
+  line-height: var(--q-line-height) !important;
+  letter-spacing: var(--q-letter-spacing) !important;   /* ★ 追加 */
   -webkit-text-stroke-width: var(--q-outline-width);
   -webkit-text-stroke-color: rgba(var(--q-outline-rgb), var(--q-text-opacity));
   paint-order: stroke fill;
@@ -224,13 +224,13 @@
   padding: 0;
 }
 
-/* Q の子孫も 1em を強制して乗算を防止 */
 #chat .mes_text.style-q-enabled q *,
 #chat .mes_text.style-q-enabled .stj-dialogue * {
   color: rgba(var(--q-text-rgb), var(--q-text-opacity)) !important;
   font-size: 1em !important;
   font-weight: var(--q-font-weight) !important;
   line-height: inherit !important;
+  letter-spacing: inherit !important;                  /* ★ 追加 */
   -webkit-text-stroke-width: var(--q-outline-width);
   -webkit-text-stroke-color: rgba(var(--q-outline-rgb), var(--q-text-opacity));
   paint-order: stroke fill;
