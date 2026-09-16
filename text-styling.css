@@ -4,6 +4,7 @@
   --p-font-weight: 400;
   --p-line-height: 1.5;
   --p-letter-spacing: 0px;
+  --p-bottom-margin: 0px;
   --p-text-rgb: 221, 221, 221;
   --p-text-opacity: 1;
   --p-outline-width: 1px;
@@ -14,6 +15,7 @@
   --q-font-weight: 400;
   --q-line-height: 1.5;
   --q-letter-spacing: 0px;
+  --q-bottom-margin: 0px;
   --q-text-rgb: 221, 221, 221;
   --q-text-opacity: 1;
   --q-outline-width: 1px;
@@ -191,7 +193,8 @@
   font-size: var(--p-font-size) !important;
   font-weight: var(--p-font-weight) !important;
   line-height: var(--p-line-height) !important;
-  letter-spacing: var(--p-letter-spacing) !important;   /* ★ 追加 */
+  letter-spacing: var(--p-letter-spacing) !important;
+  margin-bottom: var(--p-bottom-margin) !important;   /* ★ 追加：下余白 */
   -webkit-text-stroke-width: var(--p-outline-width);
   -webkit-text-stroke-color: rgba(var(--p-outline-rgb), var(--p-text-opacity));
   paint-order: stroke fill;
@@ -202,7 +205,7 @@
   font-size: 1em !important;
   font-weight: var(--p-font-weight) !important;
   line-height: inherit !important;
-  letter-spacing: inherit !important;                  /* ★ 追加：親から継承 */
+  letter-spacing: inherit !important;
   -webkit-text-stroke-width: var(--p-outline-width);
   -webkit-text-stroke-color: rgba(var(--p-outline-rgb), var(--p-text-opacity));
   paint-order: stroke fill;
@@ -216,12 +219,13 @@
   font-size: var(--q-font-size) !important;
   font-weight: var(--q-font-weight) !important;
   line-height: var(--q-line-height) !important;
-  letter-spacing: var(--q-letter-spacing) !important;   /* ★ 追加 */
+  letter-spacing: var(--q-letter-spacing) !important;
+  /* ★ 上下左右の margin を維持しつつ、下余白のみ変数化 */
+  margin: 0 0 var(--q-bottom-margin) 0 !important;
+  padding: 0;
   -webkit-text-stroke-width: var(--q-outline-width);
   -webkit-text-stroke-color: rgba(var(--q-outline-rgb), var(--q-text-opacity));
   paint-order: stroke fill;
-  margin: 0;
-  padding: 0;
 }
 
 #chat .mes_text.style-q-enabled q *,
@@ -230,7 +234,7 @@
   font-size: 1em !important;
   font-weight: var(--q-font-weight) !important;
   line-height: inherit !important;
-  letter-spacing: inherit !important;                  /* ★ 追加 */
+  letter-spacing: inherit !important;
   -webkit-text-stroke-width: var(--q-outline-width);
   -webkit-text-stroke-color: rgba(var(--q-outline-rgb), var(--q-text-opacity));
   paint-order: stroke fill;
